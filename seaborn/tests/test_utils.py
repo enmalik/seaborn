@@ -12,6 +12,14 @@ from nose.tools import assert_equal, raises
 from distutils.version import LooseVersion
 pandas_has_categoricals = LooseVersion(pd.__version__) >= "0.15"
 
+from pandas.util.testing import network
+from ..utils import get_dataset_names, load_dataset
+
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
+
 from .. import utils, rcmod
 
 
@@ -187,6 +195,28 @@ class TestSpineUtils(object):
 
         plt.close("all")
 
+    def test_despine_trim_inverted(self):
+
+        f, ax = plt.subplots()
+        ax.plot([1, 2, 3], [1, 2, 3])
+        ax.set_ylim(.85, 3.15)
+        ax.invert_yaxis()
+
+        utils.despine(trim=True)
+        for side in self.inner_sides:
+            bounds = ax.spines[side].get_bounds()
+            nt.assert_equal(bounds, (1, 3))
+
+        plt.close("all")
+
+    def test_despine_trim_noticks(self):
+
+        f, ax = plt.subplots()
+        ax.plot([1, 2, 3], [1, 2, 3])
+        ax.set_yticks([])
+        utils.despine(trim=True)
+        nt.assert_equal(ax.get_yticks().size, 0)
+
     def test_offset_spines_warns(self):
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always", category=UserWarning)
@@ -250,7 +280,7 @@ def test_ticklabels_overlap():
     assert not y
 
 
-def test_category_order():
+def test_categorical_order():
 
     x = ["a", "c", "c", "b", "a", "d"]
     order = ["a", "b", "c", "d"]
@@ -281,3 +311,34 @@ def test_category_order():
 
         out = utils.categorical_order(x, ["b", "a"])
         nt.assert_equal(out, ["b", "a"])
+
+    x = ["a", np.nan, "c", "c", "b", "a", "d"]
+    out = utils.categorical_order(x)
+    nt.assert_equal(out, ["a", "c", "b", "d"])
+
+
+if LooseVersion(pd.__version__) >= "0.15":
+
+    def check_load_dataset(name):
+        ds = load_dataset(name)
+        assert(isinstance(ds, pd.DataFrame))
+
+    @network(url="https://github.com/mwaskom/seaborn-data")
+    def test_get_dataset_names():
+        if not BeautifulSoup:
+            raise nose.SkipTest("No BeautifulSoup available for parsing html")
+        names = get_dataset_names()
+        assert(len(names) > 0)
+        assert(u"titanic" in names)
+
+    @network(url="https://github.com/mwaskom/seaborn-data")
+    def test_load_datasets():
+        if not BeautifulSoup:
+            raise nose.SkipTest("No BeautifulSoup available for parsing html")
+
+        # Heavy test to verify that we can load all available datasets
+        for name in get_dataset_names():
+            # unfortunately @network somehow obscures this generator so it
+            # does not get in effect, so we need to call explicitly
+            # yield check_load_dataset, name
+            check_load_dataset(name)

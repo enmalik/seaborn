@@ -27,7 +27,7 @@ Here are details on what has changed in the process of unifying these APIs:
 
 Along with these API changes, the following changes/enhancements were made to the plotting functions:
 
-- The default rules for ordering the categories has changed. Instead of automatically sorting the category levels, the plots now show the levels in the order the appear in the input data (i.e., the order given by ``Series.unique()``). Order can be specified when plotting with the ``order`` and ``hue_order`` parameters. Additionally, when variables are pandas objects with a "categorical" dtype, the category order is inferred from the data object.
+- The default rules for ordering the categories has changed. Instead of automatically sorting the category levels, the plots now show the levels in the order the appear in the input data (i.e., the order given by ``Series.unique()``). Order can be specified when plotting with the ``order`` and ``hue_order`` parameters. Additionally, when variables are pandas objects with a "categorical" dtype, the category order is inferred from the data object. This change also affects :class:`FacetGrid` and :class:`PairGrid`.
 
 - Added the ``scale`` and ``scale_hue`` parameters to :func:`violinplot`. These control how the width of the violins are scaled. The default is ``area``, which is different from how the violins used to be drawn. Use ``scale='width'`` to get the old behavior.
 
@@ -55,9 +55,31 @@ Other additions
 
 - Added a catch in :func:`distplot` when calculating a default number of bins. For highly skewed data it will now use 10 bins, where previously the reference rule would return "infinite" bins and cause an exception in matplotlib.
 
+- :func:`heatmap` and :func:`clustermap` now automatically use a mask for missing values, which previously were shown with the "under" value of the colormap per default `plt.pcolormesh` behavior.
+
+- The various property dictionaries that can be passed to ``plt.boxplot`` are now applied after the seaborn restyling to allow for full customizability.
+
+- Added a ceiling (50) to the default number of bins used for :func:`distplot` histograms. This will help avoid confusing errors with certain kinds of datasets that heavily violate the assumptions of the reference rule used to get a default number of bins. The ceiling is not applied when passing a specific number of bins.
+
+- Added a ``savefig`` method to :class:`JointGrid` that defaults to a tight bounding box to make it easier to save figures using this class.
+
+- Changed the default ``linewidths`` in :func:`heatmap` and :`clustermap` to 0 so that larger matrices plot correctly. This parameter still exists and can be used to get the old effect of lines demarcating each cell in the heatmap (the old default ``linewidths`` was 0.5).
+
+- You can now pass an integer to the ``xticklabels`` and ``yticklabels`` parameter of :func:`heatmap` (and, by extension, :func:`clustermap`). This will make the plot use the ticklabels inferred from the data, but only plot every ``n`` label, where ``n`` is the number you pass. This can help when visualizing larger matrices with some sensible ordering to the rows or columns of the dataframe.
+
+- Added the :func:`set_color_codes` function and the ``color_codes`` argument to :func:`set` and :func:`set_palette`. This changes the interpretation of shorthand color codes (i.e. "b", "g", k", etc.) within matplotlib to use the values from one of the named seaborn palettes (i.e. "deep", "muted", etc.). That makes it easier to have a more uniform look when using matplotlib functions directly with seaborn imported. This could be disruptive to existing plots, so it does not happen by default. It is possible this could change in the future.
+
+- Added the ``as_hex`` method to color palette objects, to return a list of hex codes rather than rgb tuples.
+
+- The :func:`color_palette` function no longer trims palettes that are longer than 6 colors when passed into it.
+
 Bug fixes
 ~~~~~~~~~
+
+- Fixed bugs in :func:`clustermap` where the mask and specified ticklabels were not being reorganized using the dendrograms.
 
 - Fixed a bug in :class:`FacetGrid` and :class:`PairGrid` that lead to incorrect legend labels when levels of the ``hue`` variable appeared in ``hue_order`` but not in the data.
 
 - Fixed a bug in :meth:`FacetGrid.set_xticklabels` or :meth:`FacetGrid.set_yticklabels` when ``col_wrap`` is being used.
+
+- Fixed a bug in :class:`PairGrid` where the ``hue_order`` parameter was ignored.

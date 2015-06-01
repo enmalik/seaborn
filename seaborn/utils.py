@@ -12,6 +12,8 @@ import matplotlib.pyplot as plt
 from distutils.version import LooseVersion
 pandas_has_categoricals = LooseVersion(pd.__version__) >= "0.15"
 
+from .external.six.moves.urllib.request import urlopen
+
 
 def ci_to_errsize(cis, heights):
     """Convert intervals to error arguments relative to plot heights.
@@ -206,22 +208,28 @@ def despine(fig=None, ax=None, top=True, right=True, left=False,
         if trim:
             # clip off the parts of the spines that extend past major ticks
             xticks = ax_i.get_xticks()
-            firsttick = np.compress(xticks >= ax_i.get_xlim()[0], xticks)[0]
-            lasttick = np.compress(xticks <= ax_i.get_xlim()[-1], xticks)[-1]
-            ax_i.spines['bottom'].set_bounds(firsttick, lasttick)
-            ax_i.spines['top'].set_bounds(firsttick, lasttick)
-            newticks = xticks.compress(xticks <= lasttick)
-            newticks = newticks.compress(newticks >= firsttick)
-            ax_i.set_xticks(newticks)
+            if xticks.size:
+                firsttick = np.compress(xticks >= min(ax_i.get_xlim()),
+                                        xticks)[0]
+                lasttick = np.compress(xticks <= max(ax_i.get_xlim()),
+                                       xticks)[-1]
+                ax_i.spines['bottom'].set_bounds(firsttick, lasttick)
+                ax_i.spines['top'].set_bounds(firsttick, lasttick)
+                newticks = xticks.compress(xticks <= lasttick)
+                newticks = newticks.compress(newticks >= firsttick)
+                ax_i.set_xticks(newticks)
 
             yticks = ax_i.get_yticks()
-            firsttick = np.compress(yticks >= ax_i.get_ylim()[0], yticks)[0]
-            lasttick = np.compress(yticks <= ax_i.get_ylim()[-1], yticks)[-1]
-            ax_i.spines['left'].set_bounds(firsttick, lasttick)
-            ax_i.spines['right'].set_bounds(firsttick, lasttick)
-            newticks = yticks.compress(yticks <= lasttick)
-            newticks = newticks.compress(newticks >= firsttick)
-            ax_i.set_yticks(newticks)
+            if yticks.size:
+                firsttick = np.compress(yticks >= min(ax_i.get_ylim()),
+                                        yticks)[0]
+                lasttick = np.compress(yticks <= max(ax_i.get_ylim()),
+                                       yticks)[-1]
+                ax_i.spines['left'].set_bounds(firsttick, lasttick)
+                ax_i.spines['right'].set_bounds(firsttick, lasttick)
+                newticks = yticks.compress(yticks <= lasttick)
+                newticks = newticks.compress(newticks >= firsttick)
+                ax_i.set_yticks(newticks)
 
 
 def offset_spines(offset=10, fig=None, ax=None):
@@ -351,8 +359,31 @@ def iqr(a):
     return q3 - q1
 
 
+def get_dataset_names():
+    """Report available example datasets, useful for reporting issues."""
+    # delayed import to not demand bs4 unless this function is actually used
+    from bs4 import BeautifulSoup
+    http = urlopen('https://github.com/mwaskom/seaborn-data/')
+    gh_list = BeautifulSoup(http)
+
+    return [l.text.replace('.csv', '')
+            for l in gh_list.find_all("a", {"class": "js-directory-link"})
+            if l.text.endswith('.csv')]
+
+
 def load_dataset(name, **kws):
-    """Load a dataset from the online repository (requires internet)."""
+    """Load a dataset from the online repository (requires internet).
+
+    Parameters
+    ----------
+    name : str
+        Name of the dataset (`name`.csv on
+        https://github.com/mwaskom/seaborn-data).  You can obtain list of
+        available datasets using :func:`get_dataset_names`
+    kws : dict, optional
+        Passed to pandas.read_csv
+
+    """
     path = "https://github.com/mwaskom/seaborn-data/raw/master/{0}.csv"
     full_path = path.format(name)
     df = pd.read_csv(full_path, **kws)
@@ -436,7 +467,7 @@ def categorical_order(values, order=None):
     Returns
     -------
     order : list
-        Ordered list of category levels
+        Ordered list of category levels not including null values.
 
     """
     if order is None:
@@ -450,5 +481,5 @@ def categorical_order(values, order=None):
                     order = values.unique()
                 except AttributeError:
                     order = pd.unique(values)
-
+        order = filter(pd.notnull, order)
     return list(order)
